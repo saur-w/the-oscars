@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oscar Awards — Dashboard Histórico</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d0d0d;color:#e0e0e0;font-family:'Segoe UI',sans-serif;font-size:14px}
+header{background:linear-gradient(135deg,#1a0a00,#3d1a00);padding:30px 40px;border-bottom:2px solid #c8922a}
+header h1{font-size:2rem;color:#f5c518;letter-spacing:2px}
+header p{color:#aaa;margin-top:6px;font-size:.9rem}
+.filters{display:flex;flex-wrap:wrap;gap:12px;padding:20px 40px;background:#111;border-bottom:1px solid #222}
+.filters select,.filters button{background:#1e1e1e;color:#e0e0e0;border:1px solid #333;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:13px}
+.filters button{background:#c8922a;color:#000;font-weight:700;border:none}
+.filters button:hover{background:#f5c518}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;padding:24px 40px}
+.stat-card{background:#161616;border:1px solid #222;border-radius:10px;padding:18px;text-align:center}
+.stat-card .val{font-size:2rem;font-weight:700;color:#f5c518}
+.stat-card .lbl{color:#888;font-size:.8rem;margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px;padding:0 40px 24px}
+.chart-box{background:#161616;border:1px solid #222;border-radius:10px;padding:20px}
+.chart-box h3{color:#c8922a;font-size:.95rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;border-bottom:1px solid #222;padding-bottom:8px}
+canvas{max-height:300px}
+.table-section{padding:0 40px 40px}
+.table-section h3{color:#c8922a;font-size:.95rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.search-box{margin-bottom:12px}
+.search-box input{width:100%;background:#1e1e1e;border:1px solid #333;color:#e0e0e0;padding:9px 14px;border-radius:6px;font-size:13px}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid #222}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{background:#1a1a1a;color:#c8922a;padding:10px 12px;text-align:left;font-weight:600;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;user-select:none}
+th:hover{background:#222}
+td{padding:9px 12px;border-bottom:1px solid #1a1a1a}
+tr:hover td{background:#1a1a1a}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.75rem;font-weight:600}
+.badge-M{background:#1a3a5c;color:#5b9bd5}
+.badge-F{background:#3a1a2c;color:#d57bb5}
+.badge-Branco{background:#2a2a2a;color:#bbb}
+.badge-Negro{background:#1a2a1a;color:#7bc47b}
+.badge-Latino{background:#2a1a00;color:#f0a040}
+.badge-Asiático{background:#1a1a3a;color:#7b7bf0}
+.badge-Misto{background:#2a2a1a;color:#d0c060}
+.winner-star{color:#f5c518;margin-right:4px}
+.pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:.72rem;border:1px solid #333}
+footer{text-align:center;padding:20px;color:#444;font-size:.75rem;border-top:1px solid #1a1a1a}
+.highlight-row td{background:#1c1800!important}
+@media(max-width:600px){.stats-grid,.charts-grid{padding:12px;gap:10px}.filters,.table-section{padding:12px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>⭐ Oscar Awards — Dashboard Histórico</h1>
+  <p>Análise completa de gênero, raça, idade e origem dos vencedores (1929–2024) · Categorias: Melhor Ator/Atriz &amp; Coadjuvante + Melhor Filme</p>
+</header>
+
+<div class="filters">
+  <select id="fDecade"><option value="">Todas as décadas</option></select>
+  <select id="fCategory"><option value="">Todas as categorias</option></select>
+  <select id="fGender"><option value="">Todos os gêneros</option><option value="M">Masculino</option><option value="F">Feminino</option></select>
+  <select id="fRace"><option value="">Todas as raças/etnias</option></select>
+  <button onclick="resetFilters()">Resetar filtros</button>
+</div>
+
+<div class="stats-grid" id="statsGrid"></div>
+<div class="charts-grid">
+  <div class="chart-box"><h3>Gênero — Distribuição Geral</h3><canvas id="chartGender"></canvas></div>
+  <div class="chart-box"><h3>Raça/Etnia — Distribuição Geral</h3><canvas id="chartRace"></canvas></div>
+  <div class="chart-box"><h3>Homens Brancos vs Negros</h3><canvas id="chartMaleRace"></canvas></div>
+  <div class="chart-box"><h3>Mulheres Brancas vs Negras</h3><canvas id="chartFemaleRace"></canvas></div>
+  <div class="chart-box"><h3>% Não-Brancos por Década (Atuação)</h3><canvas id="chartDiversity"></canvas></div>
+  <div class="chart-box"><h3>Melhor Filme — País de Produção</h3><canvas id="chartCountry"></canvas></div>
+  <div class="chart-box"><h3>Idade Média por Década — Homens vs Mulheres</h3><canvas id="chartAgeLine"></canvas></div>
+  <div class="chart-box"><h3>Distribuição de Idade por Faixa Etária</h3><canvas id="chartAge"></canvas></div>
+  <div class="chart-box"><h3>Vencedores por Categoria e Raça</h3><canvas id="chartCatRace"></canvas></div>
+</div>
+
+<div class="table-section">
+  <h3>Todos os Vencedores — Atuação</h3>
+  <div class="search-box"><input type="text" id="searchInput" placeholder="Buscar por nome, filme, categoria..." oninput="renderTable()"></div>
+  <div class="tbl-wrap">
+    <table id="winnersTable">
+      <thead>
+        <tr>
+          <th onclick="sortTable('year')">Ano ↕</th>
+          <th onclick="sortTable('category')">Categoria ↕</th>
+          <th onclick="sortTable('name')">Nome ↕</th>
+          <th onclick="sortTable('film')">Filme ↕</th>
+          <th onclick="sortTable('gender')">Gênero ↕</th>
+          <th onclick="sortTable('race')">Raça/Etnia ↕</th>
+          <th onclick="sortTable('age')">Idade ↕</th>
+          <th>Nota</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+  <p style="color:#555;margin-top:10px;font-size:.75rem">* Idades aproximadas na data da cerimônia. Raça/etnia baseada em registros públicos e autodeclaração quando disponível.</p>
+</div>
+
+<footer>Dashboard criado com dados históricos da Academia de Artes e Ciências Cinematográficas (AMPAS) | 1929–2024</footer>
+
+<script>
+// ─── DATA ──────────────────────────────────────────────────────────────────
+// gender: M=Masculino, F=Feminino
+// race: Branco, Negro, Latino, Asiático, Misto
+// age: idade aproximada na cerimônia (null = não disponível)
+// note: marcos históricos
+
+const actingWinners = [
+// ── BEST ACTOR ──
+{year:1929,cat:"Melhor Ator",name:"Emil Jannings",film:"The Last Command / The Way of All Flesh",gender:"M",race:"Branco",age:44,note:"1º vencedor da história"},
+{year:1930,cat:"Melhor Ator",name:"Warner Baxter",film:"In Old Arizona",gender:"M",race:"Branco",age:36,note:""},
+{year:1931,cat:"Melhor Ator",name:"George Arliss",film:"Disraeli",gender:"M",race:"Branco",age:62,note:""},
+{year:1932,cat:"Melhor Ator",name:"Lionel Barrymore",film:"A Free Soul",gender:"M",race:"Branco",age:53,note:""},
+{year:1933,cat:"Melhor Ator",name:"Fredric March",film:"Dr. Jekyll and Mr. Hyde",gender:"M",race:"Branco",age:36,note:"Empate histórico"},
+{year:1933,cat:"Melhor Ator",name:"Wallace Beery",film:"The Champ",gender:"M",race:"Branco",age:47,note:"Empate histórico"},
+{year:1934,cat:"Melhor Ator",name:"Charles Laughton",film:"The Private Life of Henry VIII",gender:"M",race:"Branco",age:34,note:""},
+{year:1935,cat:"Melhor Ator",name:"Clark Gable",film:"It Happened One Night",gender:"M",race:"Branco",age:34,note:""},
+{year:1936,cat:"Melhor Ator",name:"Victor McLaglen",film:"The Informer",gender:"M",race:"Branco",age:49,note:""},
+{year:1937,cat:"Melhor Ator",name:"Paul Muni",film:"The Story of Louis Pasteur",gender:"M",race:"Branco",age:42,note:""},
+{year:1938,cat:"Melhor Ator",name:"Spencer Tracy",film:"Captains Courageous",gender:"M",race:"Branco",age:37,note:""},
+{year:1939,cat:"Melhor Ator",name:"Spencer Tracy",film:"Boys Town",gender:"M",race:"Branco",age:38,note:""},
+{year:1940,cat:"Melhor Ator",name:"Robert Donat",film:"Goodbye, Mr. Chips",gender:"M",race:"Branco",age:34,note:""},
+{year:1941,cat:"Melhor Ator",name:"James Stewart",film:"The Philadelphia Story",gender:"M",race:"Branco",age:32,note:""},
+{year:1942,cat:"Melhor Ator",name:"Gary Cooper",film:"Sergeant York",gender:"M",race:"Branco",age:40,note:""},
+{year:1943,cat:"Melhor Ator",name:"James Cagney",film:"Yankee Doodle Dandy",gender:"M",race:"Branco",age:43,note:""},
+{year:1944,cat:"Melhor Ator",name:"Paul Lukas",film:"Watch on the Rhine",gender:"M",race:"Branco",age:48,note:""},
+{year:1945,cat:"Melhor Ator",name:"Bing Crosby",film:"Going My Way",gender:"M",race:"Branco",age:41,note:""},
+{year:1946,cat:"Melhor Ator",name:"Ray Milland",film:"The Lost Weekend",gender:"M",race:"Branco",age:40,note:""},
+{year:1947,cat:"Melhor Ator",name:"Fredric March",film:"The Best Years of Our Lives",gender:"M",race:"Branco",age:50,note:""},
+{year:1948,cat:"Melhor Ator",name:"Ronald Colman",film:"A Double Life",gender:"M",race:"Branco",age:56,note:""},
+{year:1949,cat:"Melhor Ator",name:"Laurence Olivier",film:"Hamlet",gender:"M",race:"Branco",age:41,note:"Também produziu e dirigiu"},
+{year:1950,cat:"Melhor Ator",name:"Broderick Crawford",film:"All the King's Men",gender:"M",race:"Branco",age:37,note:""},
+{year:1951,cat:"Melhor Ator",name:"José Ferrer",film:"Cyrano de Bergerac",gender:"M",race:"Latino",age:38,note:"1º Latino a vencer Melhor Ator"},
+{year:1952,cat:"Melhor Ator",name:"Humphrey Bogart",film:"The African Queen",gender:"M",race:"Branco",age:52,note:""},
+{year:1953,cat:"Melhor Ator",name:"Gary Cooper",film:"High Noon",gender:"M",race:"Branco",age:52,note:""},
+{year:1954,cat:"Melhor Ator",name:"William Holden",film:"Stalag 17",gender:"M",race:"Branco",age:35,note:""},
+{year:1955,cat:"Melhor Ator",name:"Marlon Brando",film:"On the Waterfront",gender:"M",race:"Branco",age:31,note:""},
+{year:1956,cat:"Melhor Ator",name:"Ernest Borgnine",film:"Marty",gender:"M",race:"Branco",age:38,note:""},
+{year:1957,cat:"Melhor Ator",name:"Yul Brynner",film:"The King and I",gender:"M",race:"Branco",age:41,note:"Nascido na Rússia/Sibéria"},
+{year:1958,cat:"Melhor Ator",name:"Alec Guinness",film:"The Bridge on the River Kwai",gender:"M",race:"Branco",age:43,note:""},
+{year:1959,cat:"Melhor Ator",name:"David Niven",film:"Separate Tables",gender:"M",race:"Branco",age:48,note:""},
+{year:1960,cat:"Melhor Ator",name:"Charlton Heston",film:"Ben-Hur",gender:"M",race:"Branco",age:35,note:""},
+{year:1961,cat:"Melhor Ator",name:"Burt Lancaster",film:"Elmer Gantry",gender:"M",race:"Branco",age:47,note:""},
+{year:1962,cat:"Melhor Ator",name:"Maximilian Schell",film:"Judgment at Nuremberg",gender:"M",race:"Branco",age:31,note:""},
+{year:1963,cat:"Melhor Ator",name:"Gregory Peck",film:"To Kill a Mockingbird",gender:"M",race:"Branco",age:46,note:""},
+{year:1964,cat:"Melhor Ator",name:"Sidney Poitier",film:"Lilies of the Field",gender:"M",race:"Negro",age:37,note:"1º homem negro a vencer Melhor Ator"},
+{year:1965,cat:"Melhor Ator",name:"Rex Harrison",film:"My Fair Lady",gender:"M",race:"Branco",age:56,note:""},
+{year:1966,cat:"Melhor Ator",name:"Lee Marvin",film:"Cat Ballou",gender:"M",race:"Branco",age:41,note:""},
+{year:1967,cat:"Melhor Ator",name:"Paul Scofield",film:"A Man for All Seasons",gender:"M",race:"Branco",age:44,note:""},
+{year:1968,cat:"Melhor Ator",name:"Rod Steiger",film:"In the Heat of the Night",gender:"M",race:"Branco",age:43,note:""},
+{year:1969,cat:"Melhor Ator",name:"Cliff Robertson",film:"Charly",gender:"M",race:"Branco",age:43,note:""},
+{year:1970,cat:"Melhor Ator",name:"John Wayne",film:"True Grit",gender:"M",race:"Branco",age:62,note:""},
+{year:1971,cat:"Melhor Ator",name:"George C. Scott",film:"Patton",gender:"M",race:"Branco",age:43,note:"Recusou o prêmio"},
+{year:1972,cat:"Melhor Ator",name:"Gene Hackman",film:"The French Connection",gender:"M",race:"Branco",age:41,note:""},
+{year:1973,cat:"Melhor Ator",name:"Marlon Brando",film:"The Godfather",gender:"M",race:"Branco",age:48,note:"Recusou o prêmio"},
+{year:1974,cat:"Melhor Ator",name:"Jack Lemmon",film:"Save the Tiger",gender:"M",race:"Branco",age:48,note:""},
+{year:1975,cat:"Melhor Ator",name:"Art Carney",film:"Harry and Tonto",gender:"M",race:"Branco",age:56,note:""},
+{year:1976,cat:"Melhor Ator",name:"Jack Nicholson",film:"One Flew Over the Cuckoo's Nest",gender:"M",race:"Branco",age:38,note:""},
+{year:1977,cat:"Melhor Ator",name:"Peter Finch",film:"Network",gender:"M",race:"Branco",age:60,note:"Póstumo"},
+{year:1978,cat:"Melhor Ator",name:"Richard Dreyfuss",film:"The Goodbye Girl",gender:"M",race:"Branco",age:30,note:""},
+{year:1979,cat:"Melhor Ator",name:"Jon Voight",film:"Coming Home",gender:"M",race:"Branco",age:40,note:""},
+{year:1980,cat:"Melhor Ator",name:"Dustin Hoffman",film:"Kramer vs. Kramer",gender:"M",race:"Branco",age:42,note:""},
+{year:1981,cat:"Melhor Ator",name:"Robert De Niro",film:"Raging Bull",gender:"M",race:"Branco",age:37,note:""},
+{year:1982,cat:"Melhor Ator",name:"Henry Fonda",film:"On Golden Pond",gender:"M",race:"Branco",age:76,note:"Mais velho a vencer Melhor Ator"},
+{year:1983,cat:"Melhor Ator",name:"Ben Kingsley",film:"Gandhi",gender:"M",race:"Misto",age:38,note:"Descendência indiana/britânica"},
+{year:1984,cat:"Melhor Ator",name:"Robert Duvall",film:"Tender Mercies",gender:"M",race:"Branco",age:52,note:""},
+{year:1985,cat:"Melhor Ator",name:"F. Murray Abraham",film:"Amadeus",gender:"M",race:"Branco",age:45,note:""},
+{year:1986,cat:"Melhor Ator",name:"William Hurt",film:"Kiss of the Spider Woman",gender:"M",race:"Branco",age:35,note:""},
+{year:1987,cat:"Melhor Ator",name:"Paul Newman",film:"The Color of Money",gender:"M",race:"Branco",age:61,note:""},
+{year:1988,cat:"Melhor Ator",name:"Michael Douglas",film:"Wall Street",gender:"M",race:"Branco",age:43,note:""},
+{year:1989,cat:"Melhor Ator",name:"Dustin Hoffman",film:"Rain Man",gender:"M",race:"Branco",age:51,note:""},
+{year:1990,cat:"Melhor Ator",name:"Daniel Day-Lewis",film:"My Left Foot",gender:"M",race:"Branco",age:32,note:""},
+{year:1991,cat:"Melhor Ator",name:"Jeremy Irons",film:"Reversal of Fortune",gender:"M",race:"Branco",age:42,note:""},
+{year:1992,cat:"Melhor Ator",name:"Anthony Hopkins",film:"The Silence of the Lambs",gender:"M",race:"Branco",age:54,note:""},
+{year:1993,cat:"Melhor Ator",name:"Al Pacino",film:"Scent of a Woman",gender:"M",race:"Branco",age:53,note:""},
+{year:1994,cat:"Melhor Ator",name:"Tom Hanks",film:"Philadelphia",gender:"M",race:"Branco",age:37,note:""},
+{year:1995,cat:"Melhor Ator",name:"Tom Hanks",film:"Forrest Gump",gender:"M",race:"Branco",age:38,note:"2º consecutivo"},
+{year:1996,cat:"Melhor Ator",name:"Nicolas Cage",film:"Leaving Las Vegas",gender:"M",race:"Branco",age:31,note:""},
+{year:1997,cat:"Melhor Ator",name:"Geoffrey Rush",film:"Shine",gender:"M",race:"Branco",age:45,note:""},
+{year:1998,cat:"Melhor Ator",name:"Jack Nicholson",film:"As Good as It Gets",gender:"M",race:"Branco",age:60,note:"3º Oscar"},
+{year:1999,cat:"Melhor Ator",name:"Roberto Benigni",film:"Life Is Beautiful",gender:"M",race:"Branco",age:46,note:"Italiano"},
+{year:2000,cat:"Melhor Ator",name:"Kevin Spacey",film:"American Beauty",gender:"M",race:"Branco",age:40,note:""},
+{year:2001,cat:"Melhor Ator",name:"Russell Crowe",film:"Gladiator",gender:"M",race:"Branco",age:36,note:""},
+{year:2002,cat:"Melhor Ator",name:"Denzel Washington",film:"Training Day",gender:"M",race:"Negro",age:47,note:"2º homem negro a vencer"},
+{year:2003,cat:"Melhor Ator",name:"Adrien Brody",film:"The Pianist",gender:"M",race:"Branco",age:29,note:"Mais jovem vencedor Melhor Ator"},
+{year:2004,cat:"Melhor Ator",name:"Sean Penn",film:"Mystic River",gender:"M",race:"Branco",age:43,note:""},
+{year:2005,cat:"Melhor Ator",name:"Jamie Foxx",film:"Ray",gender:"M",race:"Negro",age:37,note:""},
+{year:2006,cat:"Melhor Ator",name:"Philip Seymour Hoffman",film:"Capote",gender:"M",race:"Branco",age:38,note:""},
+{year:2007,cat:"Melhor Ator",name:"Forest Whitaker",film:"The Last King of Scotland",gender:"M",race:"Negro",age:45,note:""},
+{year:2008,cat:"Melhor Ator",name:"Daniel Day-Lewis",film:"There Will Be Blood",gender:"M",race:"Branco",age:50,note:"2º Oscar"},
+{year:2009,cat:"Melhor Ator",name:"Sean Penn",film:"Milk",gender:"M",race:"Branco",age:48,note:""},
+{year:2010,cat:"Melhor Ator",name:"Jeff Bridges",film:"Crazy Heart",gender:"M",race:"Branco",age:60,note:""},
+{year:2011,cat:"Melhor Ator",name:"Colin Firth",film:"The King's Speech",gender:"M",race:"Branco",age:50,note:""},
+{year:2012,cat:"Melhor Ator",name:"Jean Dujardin",film:"The Artist",gender:"M",race:"Branco",age:39,note:"Francês"},
+{year:2013,cat:"Melhor Ator",name:"Daniel Day-Lewis",film:"Lincoln",gender:"M",race:"Branco",age:55,note:"3º Oscar — recorde"},
+{year:2014,cat:"Melhor Ator",name:"Matthew McConaughey",film:"Dallas Buyers Club",gender:"M",race:"Branco",age:44,note:""},
+{year:2015,cat:"Melhor Ator",name:"Eddie Redmayne",film:"The Theory of Everything",gender:"M",race:"Branco",age:33,note:""},
+{year:2016,cat:"Melhor Ator",name:"Leonardo DiCaprio",film:"The Revenant",gender:"M",race:"Branco",age:41,note:""},
+{year:2017,cat:"Melhor Ator",name:"Casey Affleck",film:"Manchester by the Sea",gender:"M",race:"Branco",age:41,note:""},
+{year:2018,cat:"Melhor Ator",name:"Gary Oldman",film:"Darkest Hour",gender:"M",race:"Branco",age:59,note:""},
+{year:2019,cat:"Melhor Ator",name:"Rami Malek",film:"Bohemian Rhapsody",gender:"M",race:"Branco",age:37,note:"Descendência egípcia"},
+{year:2020,cat:"Melhor Ator",name:"Joaquin Phoenix",film:"Joker",gender:"M",race:"Latino",age:45,note:"Descendência porto-riquenha"},
+{year:2021,cat:"Melhor Ator",name:"Anthony Hopkins",film:"The Father",gender:"M",race:"Branco",age:83,note:"Mais velho da categoria"},
+{year:2022,cat:"Melhor Ator",name:"Will Smith",film:"King Richard",gender:"M",race:"Negro",age:53,note:""},
+{year:2023,cat:"Melhor Ator",name:"Brendan Fraser",film:"The Whale",gender:"M",race:"Branco",age:54,note:""},
+{year:2024,cat:"Melhor Ator",name:"Cillian Murphy",film:"Oppenheimer",gender:"M",race:"Branco",age:47,note:"Irlandês"},
+
+// ── BEST ACTRESS ──
+{year:1929,cat:"Melhor Atriz",name:"Janet Gaynor",film:"7th Heaven / Street Angel / Sunrise",gender:"F",race:"Branco",age:22,note:"1ª vencedora da história"},
+{year:1930,cat:"Melhor Atriz",name:"Mary Pickford",film:"Coquette",gender:"F",race:"Branco",age:37,note:""},
+{year:1931,cat:"Melhor Atriz",name:"Norma Shearer",film:"The Divorcee",gender:"F",race:"Branco",age:28,note:""},
+{year:1932,cat:"Melhor Atriz",name:"Marie Dressler",film:"Min and Bill",gender:"F",race:"Branco",age:63,note:""},
+{year:1933,cat:"Melhor Atriz",name:"Helen Hayes",film:"The Sin of Madelon Claudet",gender:"F",race:"Branco",age:32,note:""},
+{year:1934,cat:"Melhor Atriz",name:"Katharine Hepburn",film:"Morning Glory",gender:"F",race:"Branco",age:26,note:"1º de 4 Oscars"},
+{year:1935,cat:"Melhor Atriz",name:"Claudette Colbert",film:"It Happened One Night",gender:"F",race:"Branco",age:31,note:""},
+{year:1936,cat:"Melhor Atriz",name:"Bette Davis",film:"Dangerous",gender:"F",race:"Branco",age:27,note:""},
+{year:1937,cat:"Melhor Atriz",name:"Luise Rainer",film:"The Great Ziegfeld",gender:"F",race:"Branco",age:27,note:""},
+{year:1938,cat:"Melhor Atriz",name:"Luise Rainer",film:"The Good Earth",gender:"F",race:"Branco",age:28,note:"2º consecutivo"},
+{year:1939,cat:"Melhor Atriz",name:"Bette Davis",film:"Jezebel",gender:"F",race:"Branco",age:30,note:""},
+{year:1940,cat:"Melhor Atriz",name:"Vivien Leigh",film:"Gone with the Wind",gender:"F",race:"Branco",age:26,note:""},
+{year:1941,cat:"Melhor Atriz",name:"Ginger Rogers",film:"Kitty Foyle",gender:"F",race:"Branco",age:29,note:""},
+{year:1942,cat:"Melhor Atriz",name:"Joan Fontaine",film:"Suspicion",gender:"F",race:"Branco",age:24,note:""},
+{year:1943,cat:"Melhor Atriz",name:"Greer Garson",film:"Mrs. Miniver",gender:"F",race:"Branco",age:38,note:"Discurso mais longo"},
+{year:1944,cat:"Melhor Atriz",name:"Jennifer Jones",film:"The Song of Bernadette",gender:"F",race:"Branco",age:24,note:""},
+{year:1945,cat:"Melhor Atriz",name:"Ingrid Bergman",film:"Gaslight",gender:"F",race:"Branco",age:29,note:""},
+{year:1946,cat:"Melhor Atriz",name:"Joan Crawford",film:"Mildred Pierce",gender:"F",race:"Branco",age:41,note:""},
+{year:1947,cat:"Melhor Atriz",name:"Olivia de Havilland",film:"To Each His Own",gender:"F",race:"Branco",age:30,note:""},
+{year:1948,cat:"Melhor Atriz",name:"Loretta Young",film:"The Farmer's Daughter",gender:"F",race:"Branco",age:34,note:""},
+{year:1949,cat:"Melhor Atriz",name:"Jane Wyman",film:"Johnny Belinda",gender:"F",race:"Branco",age:35,note:""},
+{year:1950,cat:"Melhor Atriz",name:"Olivia de Havilland",film:"The Heiress",gender:"F",race:"Branco",age:33,note:"2º Oscar"},
+{year:1951,cat:"Melhor Atriz",name:"Judy Holliday",film:"Born Yesterday",gender:"F",race:"Branco",age:29,note:""},
+{year:1952,cat:"Melhor Atriz",name:"Vivien Leigh",film:"A Streetcar Named Desire",gender:"F",race:"Branco",age:38,note:"2º Oscar"},
+{year:1953,cat:"Melhor Atriz",name:"Shirley Booth",film:"Come Back, Little Sheba",gender:"F",race:"Branco",age:54,note:""},
+{year:1954,cat:"Melhor Atriz",name:"Audrey Hepburn",film:"Roman Holiday",gender:"F",race:"Branco",age:24,note:""},
+{year:1955,cat:"Melhor Atriz",name:"Grace Kelly",film:"The Country Girl",gender:"F",race:"Branco",age:25,note:""},
+{year:1956,cat:"Melhor Atriz",name:"Anna Magnani",film:"The Rose Tattoo",gender:"F",race:"Branco",age:47,note:"Italiana"},
+{year:1957,cat:"Melhor Atriz",name:"Ingrid Bergman",film:"Anastasia",gender:"F",race:"Branco",age:41,note:"2º Oscar"},
+{year:1958,cat:"Melhor Atriz",name:"Joanne Woodward",film:"The Three Faces of Eve",gender:"F",race:"Branco",age:27,note:""},
+{year:1959,cat:"Melhor Atriz",name:"Susan Hayward",film:"I Want to Live!",gender:"F",race:"Branco",age:41,note:""},
+{year:1960,cat:"Melhor Atriz",name:"Simone Signoret",film:"Room at the Top",gender:"F",race:"Branco",age:38,note:"Francesa"},
+{year:1961,cat:"Melhor Atriz",name:"Elizabeth Taylor",film:"Butterfield 8",gender:"F",race:"Branco",age:28,note:""},
+{year:1962,cat:"Melhor Atriz",name:"Sophia Loren",film:"Two Women",gender:"F",race:"Branco",age:27,note:"Italiana"},
+{year:1963,cat:"Melhor Atriz",name:"Anne Bancroft",film:"The Miracle Worker",gender:"F",race:"Branco",age:31,note:""},
+{year:1964,cat:"Melhor Atriz",name:"Patricia Neal",film:"Hud",gender:"F",race:"Branco",age:37,note:""},
+{year:1965,cat:"Melhor Atriz",name:"Julie Andrews",film:"Mary Poppins",gender:"F",race:"Branco",age:29,note:""},
+{year:1966,cat:"Melhor Atriz",name:"Julie Christie",film:"Darling",gender:"F",race:"Branco",age:25,note:""},
+{year:1967,cat:"Melhor Atriz",name:"Elizabeth Taylor",film:"Who's Afraid of Virginia Woolf?",gender:"F",race:"Branco",age:34,note:"2º Oscar"},
+{year:1968,cat:"Melhor Atriz",name:"Katharine Hepburn",film:"Guess Who's Coming to Dinner",gender:"F",race:"Branco",age:60,note:"Empate histórico"},
+{year:1968,cat:"Melhor Atriz",name:"Barbra Streisand",film:"Funny Girl",gender:"F",race:"Branco",age:26,note:"Empate histórico"},
+{year:1969,cat:"Melhor Atriz",name:"Katharine Hepburn",film:"The Lion in Winter",gender:"F",race:"Branco",age:61,note:"3º Oscar"},
+{year:1970,cat:"Melhor Atriz",name:"Maggie Smith",film:"The Prime of Miss Jean Brodie",gender:"F",race:"Branco",age:35,note:""},
+{year:1971,cat:"Melhor Atriz",name:"Glenda Jackson",film:"Women in Love",gender:"F",race:"Branco",age:34,note:""},
+{year:1972,cat:"Melhor Atriz",name:"Jane Fonda",film:"Klute",gender:"F",race:"Branco",age:33,note:""},
+{year:1973,cat:"Melhor Atriz",name:"Liza Minnelli",film:"Cabaret",gender:"F",race:"Branco",age:27,note:""},
+{year:1974,cat:"Melhor Atriz",name:"Glenda Jackson",film:"A Touch of Class",gender:"F",race:"Branco",age:37,note:"2º Oscar"},
+{year:1975,cat:"Melhor Atriz",name:"Ellen Burstyn",film:"Alice Doesn't Live Here Anymore",gender:"F",race:"Branco",age:42,note:""},
+{year:1976,cat:"Melhor Atriz",name:"Louise Fletcher",film:"One Flew Over the Cuckoo's Nest",gender:"F",race:"Branco",age:41,note:""},
+{year:1977,cat:"Melhor Atriz",name:"Faye Dunaway",film:"Network",gender:"F",race:"Branco",age:36,note:""},
+{year:1978,cat:"Melhor Atriz",name:"Diane Keaton",film:"Annie Hall",gender:"F",race:"Branco",age:32,note:""},
+{year:1979,cat:"Melhor Atriz",name:"Jane Fonda",film:"Coming Home",gender:"F",race:"Branco",age:41,note:"2º Oscar"},
+{year:1980,cat:"Melhor Atriz",name:"Sally Field",film:"Norma Rae",gender:"F",race:"Branco",age:33,note:""},
+{year:1981,cat:"Melhor Atriz",name:"Sissy Spacek",film:"Coal Miner's Daughter",gender:"F",race:"Branco",age:31,note:""},
+{year:1982,cat:"Melhor Atriz",name:"Katharine Hepburn",film:"On Golden Pond",gender:"F",race:"Branco",age:74,note:"4º Oscar — recorde"},
+{year:1983,cat:"Melhor Atriz",name:"Meryl Streep",film:"Sophie's Choice",gender:"F",race:"Branco",age:33,note:"1º de 3 Oscars de atuação"},
+{year:1984,cat:"Melhor Atriz",name:"Shirley MacLaine",film:"Terms of Endearment",gender:"F",race:"Branco",age:49,note:""},
+{year:1985,cat:"Melhor Atriz",name:"Sally Field",film:"Places in the Heart",gender:"F",race:"Branco",age:38,note:"2º Oscar"},
+{year:1986,cat:"Melhor Atriz",name:"Geraldine Page",film:"The Trip to Bountiful",gender:"F",race:"Branco",age:61,note:""},
+{year:1987,cat:"Melhor Atriz",name:"Marlee Matlin",film:"Children of a Lesser God",gender:"F",race:"Branco",age:21,note:"Mais jovem Melhor Atriz"},
+{year:1988,cat:"Melhor Atriz",name:"Cher",film:"Moonstruck",gender:"F",race:"Misto",age:41,note:"Descendência armênia/cherokee"},
+{year:1989,cat:"Melhor Atriz",name:"Jodie Foster",film:"The Accused",gender:"F",race:"Branco",age:26,note:""},
+{year:1990,cat:"Melhor Atriz",name:"Jessica Tandy",film:"Driving Miss Daisy",gender:"F",race:"Branco",age:80,note:"Mais velha Melhor Atriz"},
+{year:1991,cat:"Melhor Atriz",name:"Kathy Bates",film:"Misery",gender:"F",race:"Branco",age:42,note:""},
+{year:1992,cat:"Melhor Atriz",name:"Jodie Foster",film:"The Silence of the Lambs",gender:"F",race:"Branco",age:29,note:"2º Oscar"},
+{year:1993,cat:"Melhor Atriz",name:"Emma Thompson",film:"Howards End",gender:"F",race:"Branco",age:33,note:""},
+{year:1994,cat:"Melhor Atriz",name:"Holly Hunter",film:"The Piano",gender:"F",race:"Branco",age:36,note:""},
+{year:1995,cat:"Melhor Atriz",name:"Jessica Lange",film:"Blue Sky",gender:"F",race:"Branco",age:46,note:""},
+{year:1996,cat:"Melhor Atriz",name:"Susan Sarandon",film:"Dead Man Walking",gender:"F",race:"Branco",age:49,note:""},
+{year:1997,cat:"Melhor Atriz",name:"Frances McDormand",film:"Fargo",gender:"F",race:"Branco",age:39,note:"1º de 3 Oscars"},
+{year:1998,cat:"Melhor Atriz",name:"Helen Hunt",film:"As Good as It Gets",gender:"F",race:"Branco",age:34,note:""},
+{year:1999,cat:"Melhor Atriz",name:"Gwyneth Paltrow",film:"Shakespeare in Love",gender:"F",race:"Branco",age:26,note:""},
+{year:2000,cat:"Melhor Atriz",name:"Hilary Swank",film:"Boys Don't Cry",gender:"F",race:"Branco",age:25,note:""},
+{year:2001,cat:"Melhor Atriz",name:"Julia Roberts",film:"Erin Brockovich",gender:"F",race:"Branco",age:33,note:""},
+{year:2002,cat:"Melhor Atriz",name:"Halle Berry",film:"Monster's Ball",gender:"F",race:"Negro",age:35,note:"1ª mulher negra a vencer Melhor Atriz"},
+{year:2003,cat:"Melhor Atriz",name:"Nicole Kidman",film:"The Hours",gender:"F",race:"Branco",age:35,note:""},
+{year:2004,cat:"Melhor Atriz",name:"Charlize Theron",film:"Monster",gender:"F",race:"Branco",age:28,note:"Sul-africana"},
+{year:2005,cat:"Melhor Atriz",name:"Hilary Swank",film:"Million Dollar Baby",gender:"F",race:"Branco",age:30,note:"2º Oscar"},
+{year:2006,cat:"Melhor Atriz",name:"Reese Witherspoon",film:"Walk the Line",gender:"F",race:"Branco",age:29,note:""},
+{year:2007,cat:"Melhor Atriz",name:"Helen Mirren",film:"The Queen",gender:"F",race:"Branco",age:61,note:""},
+{year:2008,cat:"Melhor Atriz",name:"Marion Cotillard",film:"La Vie en Rose",gender:"F",race:"Branco",age:32,note:"Francesa"},
+{year:2009,cat:"Melhor Atriz",name:"Kate Winslet",film:"The Reader",gender:"F",race:"Branco",age:33,note:""},
+{year:2010,cat:"Melhor Atriz",name:"Sandra Bullock",film:"The Blind Side",gender:"F",race:"Branco",age:45,note:""},
+{year:2011,cat:"Melhor Atriz",name:"Natalie Portman",film:"Black Swan",gender:"F",race:"Branco",age:29,note:""},
+{year:2012,cat:"Melhor Atriz",name:"Meryl Streep",film:"The Iron Lady",gender:"F",race:"Branco",age:62,note:"3º Oscar"},
+{year:2013,cat:"Melhor Atriz",name:"Jennifer Lawrence",film:"Silver Linings Playbook",gender:"F",race:"Branco",age:22,note:""},
+{year:2014,cat:"Melhor Atriz",name:"Cate Blanchett",film:"Blue Jasmine",gender:"F",race:"Branco",age:44,note:"2º Oscar"},
+{year:2015,cat:"Melhor Atriz",name:"Julianne Moore",film:"Still Alice",gender:"F",race:"Branco",age:54,note:""},
+{year:2016,cat:"Melhor Atriz",name:"Brie Larson",film:"Room",gender:"F",race:"Branco",age:26,note:""},
+{year:2017,cat:"Melhor Atriz",name:"Emma Stone",film:"La La Land",gender:"F",race:"Branco",age:28,note:""},
+{year:2018,cat:"Melhor Atriz",name:"Frances McDormand",film:"Three Billboards Outside Ebbing, Missouri",gender:"F",race:"Branco",age:60,note:"2º Oscar"},
+{year:2019,cat:"Melhor Atriz",name:"Olivia Colman",film:"The Favourite",gender:"F",race:"Branco",age:45,note:""},
+{year:2020,cat:"Melhor Atriz",name:"Renée Zellweger",film:"Judy",gender:"F",race:"Branco",age:50,note:"2º Oscar"},
+{year:2021,cat:"Melhor Atriz",name:"Frances McDormand",film:"Nomadland",gender:"F",race:"Branco",age:63,note:"3º Oscar"},
+{year:2022,cat:"Melhor Atriz",name:"Jessica Chastain",film:"The Eyes of Tammy Faye",gender:"F",race:"Branco",age:45,note:""},
+{year:2023,cat:"Melhor Atriz",name:"Michelle Yeoh",film:"Everything Everywhere All at Once",gender:"F",race:"Asiático",age:60,note:"1ª asiática a vencer Melhor Atriz"},
+{year:2024,cat:"Melhor Atriz",name:"Emma Stone",film:"Poor Things",gender:"F",race:"Branco",age:35,note:"2º Oscar"},
+
+// ── BEST SUPPORTING ACTOR ──
+{year:1937,cat:"Melhor Ator Coadjuvante",name:"Walter Brennan",film:"Come and Get It",gender:"M",race:"Branco",age:43,note:"1º vencedor da categoria"},
+{year:1938,cat:"Melhor Ator Coadjuvante",name:"Joseph Schildkraut",film:"The Life of Emile Zola",gender:"M",race:"Branco",age:43,note:""},
+{year:1939,cat:"Melhor Ator Coadjuvante",name:"Walter Brennan",film:"Kentucky",gender:"M",race:"Branco",age:45,note:"2º Oscar"},
+{year:1940,cat:"Melhor Ator Coadjuvante",name:"Thomas Mitchell",film:"Stagecoach",gender:"M",race:"Branco",age:50,note:""},
+{year:1941,cat:"Melhor Ator Coadjuvante",name:"Walter Brennan",film:"The Westerner",gender:"M",race:"Branco",age:47,note:"3º Oscar"},
+{year:1942,cat:"Melhor Ator Coadjuvante",name:"Donald Crisp",film:"How Green Was My Valley",gender:"M",race:"Branco",age:71,note:""},
+{year:1943,cat:"Melhor Ator Coadjuvante",name:"Van Heflin",film:"Johnny Eager",gender:"M",race:"Branco",age:33,note:""},
+{year:1944,cat:"Melhor Ator Coadjuvante",name:"Charles Coburn",film:"The More the Merrier",gender:"M",race:"Branco",age:67,note:""},
+{year:1945,cat:"Melhor Ator Coadjuvante",name:"Barry Fitzgerald",film:"Going My Way",gender:"M",race:"Branco",age:57,note:""},
+{year:1946,cat:"Melhor Ator Coadjuvante",name:"James Dunn",film:"A Tree Grows in Brooklyn",gender:"M",race:"Branco",age:42,note:""},
+{year:1947,cat:"Melhor Ator Coadjuvante",name:"Harold Russell",film:"The Best Years of Our Lives",gender:"M",race:"Branco",age:33,note:"Veterano amputado, não-ator"},
+{year:1948,cat:"Melhor Ator Coadjuvante",name:"Edmund Gwenn",film:"Miracle on 34th Street",gender:"M",race:"Branco",age:72,note:""},
+{year:1949,cat:"Melhor Ator Coadjuvante",name:"Walter Huston",film:"The Treasure of the Sierra Madre",gender:"M",race:"Branco",age:64,note:""},
+{year:1950,cat:"Melhor Ator Coadjuvante",name:"Dean Jagger",film:"Twelve O'Clock High",gender:"M",race:"Branco",age:44,note:""},
+{year:1951,cat:"Melhor Ator Coadjuvante",name:"George Sanders",film:"All About Eve",gender:"M",race:"Branco",age:44,note:""},
+{year:1952,cat:"Melhor Ator Coadjuvante",name:"Karl Malden",film:"A Streetcar Named Desire",gender:"M",race:"Branco",age:39,note:""},
+{year:1953,cat:"Melhor Ator Coadjuvante",name:"Anthony Quinn",film:"Viva Zapata!",gender:"M",race:"Latino",age:38,note:"1º Latino a vencer esta categoria"},
+{year:1954,cat:"Melhor Ator Coadjuvante",name:"Frank Sinatra",film:"From Here to Eternity",gender:"M",race:"Branco",age:38,note:""},
+{year:1955,cat:"Melhor Ator Coadjuvante",name:"Edmond O'Brien",film:"The Barefoot Contessa",gender:"M",race:"Branco",age:38,note:""},
+{year:1956,cat:"Melhor Ator Coadjuvante",name:"Jack Lemmon",film:"Mister Roberts",gender:"M",race:"Branco",age:31,note:""},
+{year:1957,cat:"Melhor Ator Coadjuvante",name:"Anthony Quinn",film:"Lust for Life",gender:"M",race:"Latino",age:41,note:"2º Oscar"},
+{year:1958,cat:"Melhor Ator Coadjuvante",name:"Red Buttons",film:"Sayonara",gender:"M",race:"Branco",age:38,note:""},
+{year:1959,cat:"Melhor Ator Coadjuvante",name:"Burl Ives",film:"The Big Country",gender:"M",race:"Branco",age:50,note:""},
+{year:1960,cat:"Melhor Ator Coadjuvante",name:"Hugh Griffith",film:"Ben-Hur",gender:"M",race:"Branco",age:47,note:""},
+{year:1961,cat:"Melhor Ator Coadjuvante",name:"Peter Ustinov",film:"Spartacus",gender:"M",race:"Branco",age:40,note:""},
+{year:1962,cat:"Melhor Ator Coadjuvante",name:"George Chakiris",film:"West Side Story",gender:"M",race:"Branco",age:28,note:""},
+{year:1963,cat:"Melhor Ator Coadjuvante",name:"Ed Begley",film:"Sweet Bird of Youth",gender:"M",race:"Branco",age:55,note:""},
+{year:1964,cat:"Melhor Ator Coadjuvante",name:"Melvyn Douglas",film:"Hud",gender:"M",race:"Branco",age:62,note:""},
+{year:1965,cat:"Melhor Ator Coadjuvante",name:"Peter Ustinov",film:"Topkapi",gender:"M",race:"Branco",age:44,note:"2º Oscar"},
+{year:1966,cat:"Melhor Ator Coadjuvante",name:"Martin Balsam",film:"A Thousand Clowns",gender:"M",race:"Branco",age:46,note:""},
+{year:1967,cat:"Melhor Ator Coadjuvante",name:"Walter Matthau",film:"The Fortune Cookie",gender:"M",race:"Branco",age:47,note:""},
+{year:1968,cat:"Melhor Ator Coadjuvante",name:"George Kennedy",film:"Cool Hand Luke",gender:"M",race:"Branco",age:43,note:""},
+{year:1969,cat:"Melhor Ator Coadjuvante",name:"Jack Albertson",film:"The Subject Was Roses",gender:"M",race:"Branco",age:59,note:""},
+{year:1970,cat:"Melhor Ator Coadjuvante",name:"Gig Young",film:"They Shoot Horses, Don't They?",gender:"M",race:"Branco",age:55,note:""},
+{year:1971,cat:"Melhor Ator Coadjuvante",name:"John Mills",film:"Ryan's Daughter",gender:"M",race:"Branco",age:62,note:""},
+{year:1972,cat:"Melhor Ator Coadjuvante",name:"Ben Johnson",film:"The Last Picture Show",gender:"M",race:"Branco",age:52,note:""},
+{year:1973,cat:"Melhor Ator Coadjuvante",name:"Joel Grey",film:"Cabaret",gender:"M",race:"Branco",age:41,note:""},
+{year:1974,cat:"Melhor Ator Coadjuvante",name:"John Houseman",film:"The Paper Chase",gender:"M",race:"Branco",age:71,note:""},
+{year:1975,cat:"Melhor Ator Coadjuvante",name:"Robert De Niro",film:"The Godfather Part II",gender:"M",race:"Branco",age:31,note:""},
+{year:1976,cat:"Melhor Ator Coadjuvante",name:"George Burns",film:"The Sunshine Boys",gender:"M",race:"Branco",age:79,note:""},
+{year:1977,cat:"Melhor Ator Coadjuvante",name:"Jason Robards",film:"All the President's Men",gender:"M",race:"Branco",age:54,note:""},
+{year:1978,cat:"Melhor Ator Coadjuvante",name:"Jason Robards",film:"Julia",gender:"M",race:"Branco",age:55,note:"2º consecutivo"},
+{year:1979,cat:"Melhor Ator Coadjuvante",name:"Christopher Walken",film:"The Deer Hunter",gender:"M",race:"Branco",age:35,note:""},
+{year:1980,cat:"Melhor Ator Coadjuvante",name:"Melvyn Douglas",film:"Being There",gender:"M",race:"Branco",age:79,note:""},
+{year:1981,cat:"Melhor Ator Coadjuvante",name:"Timothy Hutton",film:"Ordinary People",gender:"M",race:"Branco",age:20,note:"Mais jovem da categoria"},
+{year:1982,cat:"Melhor Ator Coadjuvante",name:"John Gielgud",film:"Arthur",gender:"M",race:"Branco",age:77,note:""},
+{year:1983,cat:"Melhor Ator Coadjuvante",name:"Louis Gossett Jr.",film:"An Officer and a Gentleman",gender:"M",race:"Negro",age:46,note:"1º homem negro nesta categoria"},
+{year:1984,cat:"Melhor Ator Coadjuvante",name:"Jack Nicholson",film:"Terms of Endearment",gender:"M",race:"Branco",age:46,note:""},
+{year:1985,cat:"Melhor Ator Coadjuvante",name:"Haing S. Ngor",film:"The Killing Fields",gender:"M",race:"Asiático",age:44,note:"Cambojano, não-ator profissional"},
+{year:1986,cat:"Melhor Ator Coadjuvante",name:"Don Ameche",film:"Cocoon",gender:"M",race:"Branco",age:77,note:""},
+{year:1987,cat:"Melhor Ator Coadjuvante",name:"Michael Caine",film:"Hannah and Her Sisters",gender:"M",race:"Branco",age:53,note:""},
+{year:1988,cat:"Melhor Ator Coadjuvante",name:"Sean Connery",film:"The Untouchables",gender:"M",race:"Branco",age:57,note:""},
+{year:1989,cat:"Melhor Ator Coadjuvante",name:"Kevin Kline",film:"A Fish Called Wanda",gender:"M",race:"Branco",age:41,note:""},
+{year:1990,cat:"Melhor Ator Coadjuvante",name:"Denzel Washington",film:"Glory",gender:"M",race:"Negro",age:35,note:"1º Oscar de Denzel"},
+{year:1991,cat:"Melhor Ator Coadjuvante",name:"Joe Pesci",film:"GoodFellas",gender:"M",race:"Branco",age:47,note:""},
+{year:1992,cat:"Melhor Ator Coadjuvante",name:"Jack Palance",film:"City Slickers",gender:"M",race:"Branco",age:72,note:""},
+{year:1993,cat:"Melhor Ator Coadjuvante",name:"Gene Hackman",film:"Unforgiven",gender:"M",race:"Branco",age:62,note:"2º Oscar"},
+{year:1994,cat:"Melhor Ator Coadjuvante",name:"Tommy Lee Jones",film:"The Fugitive",gender:"M",race:"Branco",age:47,note:""},
+{year:1995,cat:"Melhor Ator Coadjuvante",name:"Martin Landau",film:"Ed Wood",gender:"M",race:"Branco",age:67,note:""},
+{year:1996,cat:"Melhor Ator Coadjuvante",name:"Kevin Spacey",film:"The Usual Suspects",gender:"M",race:"Branco",age:36,note:""},
+{year:1997,cat:"Melhor Ator Coadjuvante",name:"Cuba Gooding Jr.",film:"Jerry Maguire",gender:"M",race:"Negro",age:29,note:""},
+{year:1998,cat:"Melhor Ator Coadjuvante",name:"Robin Williams",film:"Good Will Hunting",gender:"M",race:"Branco",age:46,note:""},
+{year:1999,cat:"Melhor Ator Coadjuvante",name:"James Coburn",film:"Affliction",gender:"M",race:"Branco",age:70,note:""},
+{year:2000,cat:"Melhor Ator Coadjuvante",name:"Michael Caine",film:"The Cider House Rules",gender:"M",race:"Branco",age:66,note:"2º Oscar"},
+{year:2001,cat:"Melhor Ator Coadjuvante",name:"Benicio del Toro",film:"Traffic",gender:"M",race:"Latino",age:34,note:"Porto-riquenho"},
+{year:2002,cat:"Melhor Ator Coadjuvante",name:"Jim Broadbent",film:"Iris",gender:"M",race:"Branco",age:52,note:""},
+{year:2003,cat:"Melhor Ator Coadjuvante",name:"Chris Cooper",film:"Adaptation",gender:"M",race:"Branco",age:51,note:""},
+{year:2004,cat:"Melhor Ator Coadjuvante",name:"Tim Robbins",film:"Mystic River",gender:"M",race:"Branco",age:44,note:""},
+{year:2005,cat:"Melhor Ator Coadjuvante",name:"Morgan Freeman",film:"Million Dollar Baby",gender:"M",race:"Negro",age:67,note:""},
+{year:2006,cat:"Melhor Ator Coadjuvante",name:"George Clooney",film:"Syriana",gender:"M",race:"Branco",age:44,note:""},
+{year:2007,cat:"Melhor Ator Coadjuvante",name:"Alan Arkin",film:"Little Miss Sunshine",gender:"M",race:"Branco",age:72,note:""},
+{year:2008,cat:"Melhor Ator Coadjuvante",name:"Javier Bardem",film:"No Country for Old Men",gender:"M",race:"Branco",age:38,note:"Espanhol"},
+{year:2009,cat:"Melhor Ator Coadjuvante",name:"Heath Ledger",film:"The Dark Knight",gender:"M",race:"Branco",age:28,note:"Póstumo"},
+{year:2010,cat:"Melhor Ator Coadjuvante",name:"Christoph Waltz",film:"Inglourious Basterds",gender:"M",race:"Branco",age:53,note:"Austríaco"},
+{year:2011,cat:"Melhor Ator Coadjuvante",name:"Christian Bale",film:"The Fighter",gender:"M",race:"Branco",age:36,note:""},
+{year:2012,cat:"Melhor Ator Coadjuvante",name:"Christopher Plummer",film:"Beginners",gender:"M",race:"Branco",age:82,note:"Mais velho da categoria"},
+{year:2013,cat:"Melhor Ator Coadjuvante",name:"Christoph Waltz",film:"Django Unchained",gender:"M",race:"Branco",age:56,note:"2º Oscar"},
+{year:2014,cat:"Melhor Ator Coadjuvante",name:"Jared Leto",film:"Dallas Buyers Club",gender:"M",race:"Branco",age:42,note:""},
+{year:2015,cat:"Melhor Ator Coadjuvante",name:"J.K. Simmons",film:"Whiplash",gender:"M",race:"Branco",age:60,note:""},
+{year:2016,cat:"Melhor Ator Coadjuvante",name:"Mark Rylance",film:"Bridge of Spies",gender:"M",race:"Branco",age:56,note:""},
+{year:2017,cat:"Melhor Ator Coadjuvante",name:"Mahershala Ali",film:"Moonlight",gender:"M",race:"Negro",age:43,note:""},
+{year:2018,cat:"Melhor Ator Coadjuvante",name:"Sam Rockwell",film:"Three Billboards Outside Ebbing, Missouri",gender:"M",race:"Branco",age:49,note:""},
+{year:2019,cat:"Melhor Ator Coadjuvante",name:"Mahershala Ali",film:"Green Book",gender:"M",race:"Negro",age:44,note:"2º Oscar"},
+{year:2020,cat:"Melhor Ator Coadjuvante",name:"Brad Pitt",film:"Once Upon a Time in Hollywood",gender:"M",race:"Branco",age:56,note:""},
+{year:2021,cat:"Melhor Ator Coadjuvante",name:"Daniel Kaluuya",film:"Judas and the Black Messiah",gender:"M",race:"Negro",age:32,note:"Britânico/ugandês"},
+{year:2022,cat:"Melhor Ator Coadjuvante",name:"Troy Kotsur",film:"CODA",gender:"M",race:"Branco",age:54,note:"Surdo, 1º homem surdo a vencer atuação"},
+{year:2023,cat:"Melhor Ator Coadjuvante",name:"Ke Huy Quan",film:"Everything Everywhere All at Once",gender:"M",race:"Asiático",age:51,note:"Vietnamita-americano"},
+{year:2024,cat:"Melhor Ator Coadjuvante",name:"Robert Downey Jr.",film:"Oppenheimer",gender:"M",race:"Branco",age:58,note:""},
+
+// ── BEST SUPPORTING ACTRESS ──
+{year:1937,cat:"Melhor Atriz Coadjuvante",name:"Gale Sondergaard",film:"Anthony Adverse",gender:"F",race:"Branco",age:38,note:"1ª vencedora da categoria"},
+{year:1938,cat:"Melhor Atriz Coadjuvante",name:"Alice Brady",film:"In Old Chicago",gender:"F",race:"Branco",age:56,note:""},
+{year:1939,cat:"Melhor Atriz Coadjuvante",name:"Fay Bainter",film:"Jezebel",gender:"F",race:"Branco",age:48,note:""},
+{year:1940,cat:"Melhor Atriz Coadjuvante",name:"Hattie McDaniel",film:"Gone with the Wind",gender:"F",race:"Negro",age:45,note:"1ª pessoa negra a vencer um Oscar"},
+{year:1941,cat:"Melhor Atriz Coadjuvante",name:"Jane Darwell",film:"The Grapes of Wrath",gender:"F",race:"Branco",age:58,note:""},
+{year:1942,cat:"Melhor Atriz Coadjuvante",name:"Mary Astor",film:"The Great Lie",gender:"F",race:"Branco",age:35,note:""},
+{year:1943,cat:"Melhor Atriz Coadjuvante",name:"Teresa Wright",film:"Mrs. Miniver",gender:"F",race:"Branco",age:24,note:""},
+{year:1944,cat:"Melhor Atriz Coadjuvante",name:"Katina Paxinou",film:"For Whom the Bell Tolls",gender:"F",race:"Branco",age:43,note:"Grega"},
+{year:1945,cat:"Melhor Atriz Coadjuvante",name:"Ethel Barrymore",film:"None But the Lonely Heart",gender:"F",race:"Branco",age:64,note:""},
+{year:1946,cat:"Melhor Atriz Coadjuvante",name:"Anne Revere",film:"National Velvet",gender:"F",race:"Branco",age:44,note:""},
+{year:1947,cat:"Melhor Atriz Coadjuvante",name:"Anne Baxter",film:"The Razor's Edge",gender:"F",race:"Branco",age:23,note:""},
+{year:1948,cat:"Melhor Atriz Coadjuvante",name:"Celeste Holm",film:"Gentleman's Agreement",gender:"F",race:"Branco",age:29,note:""},
+{year:1949,cat:"Melhor Atriz Coadjuvante",name:"Claire Trevor",film:"Key Largo",gender:"F",race:"Branco",age:40,note:""},
+{year:1950,cat:"Melhor Atriz Coadjuvante",name:"Mercedes McCambridge",film:"All the King's Men",gender:"F",race:"Branco",age:31,note:""},
+{year:1951,cat:"Melhor Atriz Coadjuvante",name:"Josephine Hull",film:"Harvey",gender:"F",race:"Branco",age:66,note:""},
+{year:1952,cat:"Melhor Atriz Coadjuvante",name:"Kim Hunter",film:"A Streetcar Named Desire",gender:"F",race:"Branco",age:30,note:""},
+{year:1953,cat:"Melhor Atriz Coadjuvante",name:"Gloria Grahame",film:"The Bad and the Beautiful",gender:"F",race:"Branco",age:29,note:""},
+{year:1954,cat:"Melhor Atriz Coadjuvante",name:"Donna Reed",film:"From Here to Eternity",gender:"F",race:"Branco",age:33,note:""},
+{year:1955,cat:"Melhor Atriz Coadjuvante",name:"Eva Marie Saint",film:"On the Waterfront",gender:"F",race:"Branco",age:30,note:""},
+{year:1956,cat:"Melhor Atriz Coadjuvante",name:"Jo Van Fleet",film:"East of Eden",gender:"F",race:"Branco",age:40,note:""},
+{year:1957,cat:"Melhor Atriz Coadjuvante",name:"Dorothy Malone",film:"Written on the Wind",gender:"F",race:"Branco",age:33,note:""},
+{year:1958,cat:"Melhor Atriz Coadjuvante",name:"Miyoshi Umeki",film:"Sayonara",gender:"F",race:"Asiático",age:26,note:"1ª asiática a vencer atuação"},
+{year:1959,cat:"Melhor Atriz Coadjuvante",name:"Wendy Hiller",film:"Separate Tables",gender:"F",race:"Branco",age:47,note:""},
+{year:1960,cat:"Melhor Atriz Coadjuvante",name:"Shelley Winters",film:"The Diary of Anne Frank",gender:"F",race:"Branco",age:37,note:""},
+{year:1961,cat:"Melhor Atriz Coadjuvante",name:"Shirley Jones",film:"Elmer Gantry",gender:"F",race:"Branco",age:27,note:""},
+{year:1962,cat:"Melhor Atriz Coadjuvante",name:"Rita Moreno",film:"West Side Story",gender:"F",race:"Latino",age:30,note:"Porto-riquenha"},
+{year:1963,cat:"Melhor Atriz Coadjuvante",name:"Patty Duke",film:"The Miracle Worker",gender:"F",race:"Branco",age:15,note:"Mais jovem vencedora da categoria"},
+{year:1964,cat:"Melhor Atriz Coadjuvante",name:"Margaret Rutherford",film:"The V.I.P.s",gender:"F",race:"Branco",age:72,note:""},
+{year:1965,cat:"Melhor Atriz Coadjuvante",name:"Lila Kedrova",film:"Zorba the Greek",gender:"F",race:"Branco",age:51,note:"Russa-francesa"},
+{year:1966,cat:"Melhor Atriz Coadjuvante",name:"Shelley Winters",film:"A Patch of Blue",gender:"F",race:"Branco",age:43,note:"2º Oscar"},
+{year:1967,cat:"Melhor Atriz Coadjuvante",name:"Sandy Dennis",film:"Who's Afraid of Virginia Woolf?",gender:"F",race:"Branco",age:29,note:""},
+{year:1968,cat:"Melhor Atriz Coadjuvante",name:"Estelle Parsons",film:"Bonnie and Clyde",gender:"F",race:"Branco",age:40,note:""},
+{year:1969,cat:"Melhor Atriz Coadjuvante",name:"Ruth Gordon",film:"Rosemary's Baby",gender:"F",race:"Branco",age:72,note:""},
+{year:1970,cat:"Melhor Atriz Coadjuvante",name:"Goldie Hawn",film:"Cactus Flower",gender:"F",race:"Branco",age:24,note:""},
+{year:1971,cat:"Melhor Atriz Coadjuvante",name:"Helen Hayes",film:"Airport",gender:"F",race:"Branco",age:70,note:"2º Oscar"},
+{year:1972,cat:"Melhor Atriz Coadjuvante",name:"Cloris Leachman",film:"The Last Picture Show",gender:"F",race:"Branco",age:45,note:""},
+{year:1973,cat:"Melhor Atriz Coadjuvante",name:"Eileen Heckart",film:"Butterflies Are Free",gender:"F",race:"Branco",age:53,note:""},
+{year:1974,cat:"Melhor Atriz Coadjuvante",name:"Tatum O'Neal",film:"Paper Moon",gender:"F",race:"Branco",age:10,note:"Mais jovem vencedora de Oscar"},
+{year:1975,cat:"Melhor Atriz Coadjuvante",name:"Ingrid Bergman",film:"Murder on the Orient Express",gender:"F",race:"Branco",age:58,note:"3º Oscar"},
+{year:1976,cat:"Melhor Atriz Coadjuvante",name:"Lee Grant",film:"Shampoo",gender:"F",race:"Branco",age:49,note:""},
+{year:1977,cat:"Melhor Atriz Coadjuvante",name:"Beatrice Straight",film:"Network",gender:"F",race:"Branco",age:60,note:"Menor cena a vencer Oscar"},
+{year:1978,cat:"Melhor Atriz Coadjuvante",name:"Vanessa Redgrave",film:"Julia",gender:"F",race:"Branco",age:40,note:""},
+{year:1979,cat:"Melhor Atriz Coadjuvante",name:"Maggie Smith",film:"California Suite",gender:"F",race:"Branco",age:44,note:"2º Oscar"},
+{year:1980,cat:"Melhor Atriz Coadjuvante",name:"Meryl Streep",film:"Kramer vs. Kramer",gender:"F",race:"Branco",age:30,note:"1º Oscar"},
+{year:1981,cat:"Melhor Atriz Coadjuvante",name:"Mary Steenburgen",film:"Melvin and Howard",gender:"F",race:"Branco",age:27,note:""},
+{year:1982,cat:"Melhor Atriz Coadjuvante",name:"Maureen Stapleton",film:"Reds",gender:"F",race:"Branco",age:56,note:""},
+{year:1983,cat:"Melhor Atriz Coadjuvante",name:"Jessica Lange",film:"Tootsie",gender:"F",race:"Branco",age:33,note:""},
+{year:1984,cat:"Melhor Atriz Coadjuvante",name:"Linda Hunt",film:"The Year of Living Dangerously",gender:"F",race:"Branco",age:38,note:"Venceu interpretando personagem masculino"},
+{year:1985,cat:"Melhor Atriz Coadjuvante",name:"Peggy Ashcroft",film:"A Passage to India",gender:"F",race:"Branco",age:77,note:""},
+{year:1986,cat:"Melhor Atriz Coadjuvante",name:"Anjelica Huston",film:"Prizzi's Honor",gender:"F",race:"Branco",age:34,note:""},
+{year:1987,cat:"Melhor Atriz Coadjuvante",name:"Dianne Wiest",film:"Hannah and Her Sisters",gender:"F",race:"Branco",age:40,note:""},
+{year:1988,cat:"Melhor Atriz Coadjuvante",name:"Olympia Dukakis",film:"Moonstruck",gender:"F",race:"Branco",age:56,note:""},
+{year:1989,cat:"Melhor Atriz Coadjuvante",name:"Geena Davis",film:"The Accidental Tourist",gender:"F",race:"Branco",age:32,note:""},
+{year:1990,cat:"Melhor Atriz Coadjuvante",name:"Brenda Fricker",film:"My Left Foot",gender:"F",race:"Branco",age:44,note:""},
+{year:1991,cat:"Melhor Atriz Coadjuvante",name:"Whoopi Goldberg",film:"Ghost",gender:"F",race:"Negro",age:35,note:"2ª mulher negra a vencer"},
+{year:1992,cat:"Melhor Atriz Coadjuvante",name:"Mercedes Ruehl",film:"The Fisher King",gender:"F",race:"Latino",age:44,note:""},
+{year:1993,cat:"Melhor Atriz Coadjuvante",name:"Marisa Tomei",film:"My Cousin Vinny",gender:"F",race:"Branco",age:28,note:""},
+{year:1994,cat:"Melhor Atriz Coadjuvante",name:"Anna Paquin",film:"The Piano",gender:"F",race:"Branco",age:11,note:"2ª mais jovem vencedora"},
+{year:1995,cat:"Melhor Atriz Coadjuvante",name:"Dianne Wiest",film:"Bullets over Broadway",gender:"F",race:"Branco",age:47,note:"2º Oscar"},
+{year:1996,cat:"Melhor Atriz Coadjuvante",name:"Mira Sorvino",film:"Mighty Aphrodite",gender:"F",race:"Branco",age:28,note:""},
+{year:1997,cat:"Melhor Atriz Coadjuvante",name:"Juliette Binoche",film:"The English Patient",gender:"F",race:"Branco",age:32,note:"Francesa"},
+{year:1998,cat:"Melhor Atriz Coadjuvante",name:"Kim Basinger",film:"L.A. Confidential",gender:"F",race:"Branco",age:44,note:""},
+{year:1999,cat:"Melhor Atriz Coadjuvante",name:"Judi Dench",film:"Shakespeare in Love",gender:"F",race:"Branco",age:64,note:""},
+{year:2000,cat:"Melhor Atriz Coadjuvante",name:"Angelina Jolie",film:"Girl, Interrupted",gender:"F",race:"Branco",age:24,note:""},
+{year:2001,cat:"Melhor Atriz Coadjuvante",name:"Marcia Gay Harden",film:"Pollock",gender:"F",race:"Branco",age:41,note:""},
+{year:2002,cat:"Melhor Atriz Coadjuvante",name:"Jennifer Connelly",film:"A Beautiful Mind",gender:"F",race:"Branco",age:31,note:""},
+{year:2003,cat:"Melhor Atriz Coadjuvante",name:"Catherine Zeta-Jones",film:"Chicago",gender:"F",race:"Branco",age:33,note:"Galesa"},
+{year:2004,cat:"Melhor Atriz Coadjuvante",name:"Renée Zellweger",film:"Cold Mountain",gender:"F",race:"Branco",age:34,note:""},
+{year:2005,cat:"Melhor Atriz Coadjuvante",name:"Cate Blanchett",film:"The Aviator",gender:"F",race:"Branco",age:35,note:"1º Oscar"},
+{year:2006,cat:"Melhor Atriz Coadjuvante",name:"Rachel Weisz",film:"The Constant Gardener",gender:"F",race:"Branco",age:35,note:""},
+{year:2007,cat:"Melhor Atriz Coadjuvante",name:"Jennifer Hudson",film:"Dreamgirls",gender:"F",race:"Negro",age:25,note:""},
+{year:2008,cat:"Melhor Atriz Coadjuvante",name:"Tilda Swinton",film:"Michael Clayton",gender:"F",race:"Branco",age:47,note:""},
+{year:2009,cat:"Melhor Atriz Coadjuvante",name:"Penélope Cruz",film:"Vicky Cristina Barcelona",gender:"F",race:"Branco",age:34,note:"Espanhola"},
+{year:2010,cat:"Melhor Atriz Coadjuvante",name:"Mo'Nique",film:"Precious",gender:"F",race:"Negro",age:42,note:""},
+{year:2011,cat:"Melhor Atriz Coadjuvante",name:"Melissa Leo",film:"The Fighter",gender:"F",race:"Branco",age:50,note:""},
+{year:2012,cat:"Melhor Atriz Coadjuvante",name:"Octavia Spencer",film:"The Help",gender:"F",race:"Negro",age:41,note:""},
+{year:2013,cat:"Melhor Atriz Coadjuvante",name:"Anne Hathaway",film:"Les Misérables",gender:"F",race:"Branco",age:30,note:""},
+{year:2014,cat:"Melhor Atriz Coadjuvante",name:"Lupita Nyong'o",film:"12 Years a Slave",gender:"F",race:"Negro",age:31,note:"Queniana-mexicana"},
+{year:2015,cat:"Melhor Atriz Coadjuvante",name:"Patricia Arquette",film:"Boyhood",gender:"F",race:"Branco",age:46,note:""},
+{year:2016,cat:"Melhor Atriz Coadjuvante",name:"Alicia Vikander",film:"The Danish Girl",gender:"F",race:"Branco",age:27,note:"Sueca"},
+{year:2017,cat:"Melhor Atriz Coadjuvante",name:"Viola Davis",film:"Fences",gender:"F",race:"Negro",age:51,note:""},
+{year:2018,cat:"Melhor Atriz Coadjuvante",name:"Allison Janney",film:"I, Tonya",gender:"F",race:"Branco",age:58,note:""},
+{year:2019,cat:"Melhor Atriz Coadjuvante",name:"Regina King",film:"If Beale Street Could Talk",gender:"F",race:"Negro",age:48,note:""},
+{year:2020,cat:"Melhor Atriz Coadjuvante",name:"Laura Dern",film:"Marriage Story",gender:"F",race:"Branco",age:52,note:""},
+{year:2021,cat:"Melhor Atriz Coadjuvante",name:"Yuh-Jung Youn",film:"Minari",gender:"F",race:"Asiático",age:73,note:"Coreana"},
+{year:2022,cat:"Melhor Atriz Coadjuvante",name:"Ariana DeBose",film:"West Side Story",gender:"F",race:"Negro",age:31,note:"Afro-latina — 1ª atriz abertamente LGBTQ+"},
+{year:2023,cat:"Melhor Atriz Coadjuvante",name:"Jamie Lee Curtis",film:"Everything Everywhere All at Once",gender:"F",race:"Branco",age:64,note:""},
+{year:2024,cat:"Melhor Atriz Coadjuvante",name:"Da'Vine Joy Randolph",film:"The Holdovers",gender:"F",race:"Negro",age:38,note:""},
+];
+
+const bestPicture = [
+{year:1929,film:"Wings",country:"EUA"},{year:1930,film:"The Broadway Melody",country:"EUA"},
+{year:1931,film:"All Quiet on the Western Front",country:"EUA"},{year:1932,film:"Cimarron",country:"EUA"},
+{year:1933,film:"Grand Hotel",country:"EUA"},{year:1934,film:"Cavalcade",country:"EUA"},
+{year:1935,film:"It Happened One Night",country:"EUA"},{year:1936,film:"Mutiny on the Bounty",country:"EUA"},
+{year:1937,film:"The Great Ziegfeld",country:"EUA"},{year:1938,film:"The Life of Emile Zola",country:"EUA"},
+{year:1939,film:"You Can't Take It with You",country:"EUA"},{year:1940,film:"Gone with the Wind",country:"EUA"},
+{year:1941,film:"Rebecca",country:"EUA"},{year:1942,film:"How Green Was My Valley",country:"EUA"},
+{year:1943,film:"Mrs. Miniver",country:"EUA"},{year:1944,film:"Casablanca",country:"EUA"},
+{year:1945,film:"Going My Way",country:"EUA"},{year:1946,film:"The Lost Weekend",country:"EUA"},
+{year:1947,film:"The Best Years of Our Lives",country:"EUA"},{year:1948,film:"Gentleman's Agreement",country:"EUA"},
+{year:1949,film:"Hamlet",country:"Reino Unido"},{year:1950,film:"All the King's Men",country:"EUA"},
+{year:1951,film:"All About Eve",country:"EUA"},{year:1952,film:"An American in Paris",country:"EUA"},
+{year:1953,film:"The Greatest Show on Earth",country:"EUA"},{year:1954,film:"From Here to Eternity",country:"EUA"},
+{year:1955,film:"On the Waterfront",country:"EUA"},{year:1956,film:"Marty",country:"EUA"},
+{year:1957,film:"Around the World in 80 Days",country:"EUA"},{year:1958,film:"The Bridge on the River Kwai",country:"Reino Unido"},
+{year:1959,film:"Gigi",country:"EUA"},{year:1960,film:"Ben-Hur",country:"EUA"},
+{year:1961,film:"The Apartment",country:"EUA"},{year:1962,film:"West Side Story",country:"EUA"},
+{year:1963,film:"Lawrence of Arabia",country:"Reino Unido"},{year:1964,film:"Tom Jones",country:"Reino Unido"},
+{year:1965,film:"My Fair Lady",country:"EUA"},{year:1966,film:"The Sound of Music",country:"EUA"},
+{year:1967,film:"A Man for All Seasons",country:"Reino Unido"},{year:1968,film:"In the Heat of the Night",country:"EUA"},
+{year:1969,film:"Oliver!",country:"Reino Unido"},{year:1970,film:"Midnight Cowboy",country:"EUA"},
+{year:1971,film:"Patton",country:"EUA"},{year:1972,film:"The French Connection",country:"EUA"},
+{year:1973,film:"The Godfather",country:"EUA"},{year:1974,film:"The Sting",country:"EUA"},
+{year:1975,film:"The Godfather Part II",country:"EUA"},{year:1976,film:"One Flew Over the Cuckoo's Nest",country:"EUA"},
+{year:1977,film:"Rocky",country:"EUA"},{year:1978,film:"Annie Hall",country:"EUA"},
+{year:1979,film:"The Deer Hunter",country:"EUA"},{year:1980,film:"Kramer vs. Kramer",country:"EUA"},
+{year:1981,film:"Ordinary People",country:"EUA"},{year:1982,film:"Chariots of Fire",country:"Reino Unido"},
+{year:1983,film:"Gandhi",country:"Reino Unido / Índia"},{year:1984,film:"Terms of Endearment",country:"EUA"},
+{year:1985,film:"Amadeus",country:"EUA"},{year:1986,film:"Out of Africa",country:"EUA"},
+{year:1987,film:"Platoon",country:"EUA"},{year:1988,film:"The Last Emperor",country:"Internacional"},
+{year:1989,film:"Rain Man",country:"EUA"},{year:1990,film:"Driving Miss Daisy",country:"EUA"},
+{year:1991,film:"Dances with Wolves",country:"EUA"},{year:1992,film:"The Silence of the Lambs",country:"EUA"},
+{year:1993,film:"Unforgiven",country:"EUA"},{year:1994,film:"Schindler's List",country:"EUA"},
+{year:1995,film:"Forrest Gump",country:"EUA"},{year:1996,film:"Braveheart",country:"EUA"},
+{year:1997,film:"The English Patient",country:"EUA / Reino Unido"},{year:1998,film:"Titanic",country:"EUA"},
+{year:1999,film:"Shakespeare in Love",country:"EUA / Reino Unido"},{year:2000,film:"American Beauty",country:"EUA"},
+{year:2001,film:"Gladiator",country:"EUA / Reino Unido"},{year:2002,film:"A Beautiful Mind",country:"EUA"},
+{year:2003,film:"Chicago",country:"EUA"},{year:2004,film:"The Lord of the Rings: The Return of the King",country:"Nova Zelândia / EUA"},
+{year:2005,film:"Million Dollar Baby",country:"EUA"},{year:2006,film:"Crash",country:"EUA"},
+{year:2007,film:"The Departed",country:"EUA"},{year:2008,film:"No Country for Old Men",country:"EUA"},
+{year:2009,film:"Slumdog Millionaire",country:"Reino Unido"},{year:2010,film:"The Hurt Locker",country:"EUA"},
+{year:2011,film:"The King's Speech",country:"Reino Unido"},{year:2012,film:"The Artist",country:"França"},
+{year:2013,film:"Argo",country:"EUA"},{year:2014,film:"12 Years a Slave",country:"EUA / Reino Unido"},
+{year:2015,film:"Birdman",country:"EUA"},{year:2016,film:"Spotlight",country:"EUA"},
+{year:2017,film:"Moonlight",country:"EUA"},{year:2018,film:"The Shape of Water",country:"EUA"},
+{year:2019,film:"Green Book",country:"EUA"},{year:2020,film:"Parasite",country:"Coreia do Sul"},
+{year:2021,film:"Nomadland",country:"EUA"},{year:2022,film:"CODA",country:"EUA"},
+{year:2023,film:"Everything Everywhere All at Once",country:"EUA"},{year:2024,film:"Oppenheimer",country:"EUA / Reino Unido"},
+];
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let filtered = [...actingWinners];
+let sortKey = 'year';
+let sortDir = 1;
+let charts = {};
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const count = (arr, fn) => arr.filter(fn).length;
+const pct = (n, total) => total ? ((n/total)*100).toFixed(1) : '0.0';
+
+function getDecade(y) { return Math.floor(y/10)*10 + 's'; }
+
+const RACE_COLORS = {
+  'Branco':   '#6b7280',
+  'Negro':    '#22c55e',
+  'Latino':   '#f59e0b',
+  'Asiático': '#6366f1',
+  'Misto':    '#ec4899',
+};
+
+// ─── POPULATE FILTERS ─────────────────────────────────────────────────────────
+function initFilters() {
+  const decades = [...new Set(actingWinners.map(w => Math.floor(w.year/10)*10))].sort();
+  const fDec = document.getElementById('fDecade');
+  decades.forEach(d => { const o=document.createElement('option'); o.value=d; o.textContent=d+'s'; fDec.appendChild(o); });
+
+  const cats = [...new Set(actingWinners.map(w => w.cat))].sort();
+  const fCat = document.getElementById('fCategory');
+  cats.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; fCat.appendChild(o); });
+
+  const races = [...new Set(actingWinners.map(w => w.race))].sort();
+  const fRace = document.getElementById('fRace');
+  races.forEach(r => { const o=document.createElement('option'); o.value=r; o.textContent=r; fRace.appendChild(o); });
+}
+
+function applyFilters() {
+  const dec = document.getElementById('fDecade').value;
+  const cat = document.getElementById('fCategory').value;
+  const gen = document.getElementById('fGender').value;
+  const race = document.getElementById('fRace').value;
+
+  filtered = actingWinners.filter(w =>
+    (!dec  || Math.floor(w.year/10)*10 == dec) &&
+    (!cat  || w.cat === cat) &&
+    (!gen  || w.gender === gen) &&
+    (!race || w.race === race)
+  );
+
+  renderStats();
+  renderTable();
+  updateAllCharts();
+}
+
+function resetFilters() {
+  ['fDecade','fCategory','fGender','fRace'].forEach(id => document.getElementById(id).value='');
+  applyFilters();
+}
+
+// ─── STATS CARDS ─────────────────────────────────────────────────────────────
+function renderStats() {
+  const total = filtered.length;
+  const males = count(filtered, w => w.gender==='M');
+  const females = count(filtered, w => w.gender==='F');
+  const black = count(filtered, w => w.race==='Negro');
+  const white = count(filtered, w => w.race==='Branco');
+  const latin = count(filtered, w => w.race==='Latino');
+  const asian = count(filtered, w => w.race==='Asiático');
+  const avgOf = arr => { const v=arr.map(w=>w.age).filter(Boolean); return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):'—'; };
+  const maleWinners  = filtered.filter(w=>w.gender==='M');
+  const femaleWinners= filtered.filter(w=>w.gender==='F');
+  const avgAgeM = avgOf(maleWinners);
+  const avgAgeF = avgOf(femaleWinners);
+  const ageDiff = (avgAgeM!=='—'&&avgAgeF!=='—') ? Math.abs(avgAgeM-avgAgeF).toFixed(1) : '—';
+  const olderGender = (avgAgeM!=='—'&&avgAgeF!=='—') ? (parseFloat(avgAgeM)>parseFloat(avgAgeF)?'Homens mais velhos':'Mulheres mais velhas') : '';
+
+  const cards = [
+    {val: total, lbl: 'Vencedores (atuação)'},
+    {val: males + ' / ' + females, lbl: 'Homens / Mulheres'},
+    {val: pct(males,total)+'%', lbl: 'Masculino'},
+    {val: pct(females,total)+'%', lbl: 'Feminino'},
+    {val: pct(white,total)+'%', lbl: 'Brancos'},
+    {val: pct(black,total)+'%', lbl: 'Negros'},
+    {val: pct(latin,total)+'%', lbl: 'Latinos'},
+    {val: pct(asian,total)+'%', lbl: 'Asiáticos'},
+    {val: avgAgeM, lbl: 'Idade média — Homens', color:'#5b9bd5'},
+    {val: avgAgeF, lbl: 'Idade média — Mulheres', color:'#d57bb5'},
+    {val: (ageDiff!=='—'?'+'+ageDiff+' anos':'—'), lbl: 'Diferença de idade ('+olderGender+')', color:'#f5c518'},
+  ];
+
+  document.getElementById('statsGrid').innerHTML = cards.map(c=>
+    `<div class="stat-card"><div class="val" style="${c.color?'color:'+c.color:''}">${c.val}</div><div class="lbl">${c.lbl}</div></div>`
+  ).join('');
+}
+
+// ─── TABLE ────────────────────────────────────────────────────────────────────
+function sortTable(key) {
+  if(sortKey===key) sortDir *= -1; else { sortKey=key; sortDir=1; }
+  renderTable();
+}
+
+function renderTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  let rows = filtered.filter(w =>
+    !q ||
+    w.name.toLowerCase().includes(q) ||
+    w.film.toLowerCase().includes(q) ||
+    w.cat.toLowerCase().includes(q) ||
+    w.race.toLowerCase().includes(q)
+  );
+
+  rows.sort((a,b) => {
+    const av = a[sortKey]??'', bv = b[sortKey]??'';
+    return typeof av==='number' ? (av-bv)*sortDir : av.toString().localeCompare(bv.toString())*sortDir;
+  });
+
+  document.getElementById('tableBody').innerHTML = rows.map(w => `
+    <tr>
+      <td>${w.year}</td>
+      <td>${w.cat}</td>
+      <td><span class="winner-star">★</span>${w.name}</td>
+      <td><em>${w.film}</em></td>
+      <td><span class="badge badge-${w.gender}">${w.gender==='M'?'Masculino':'Feminino'}</span></td>
+      <td><span class="badge badge-${w.race}">${w.race}</span></td>
+      <td>${w.age??'—'}</td>
+      <td style="color:#666;font-size:.75rem">${w.note||''}</td>
+    </tr>
+  `).join('');
+}
+
+// ─── CHARTS ──────────────────────────────────────────────────────────────────
+function makeChart(id, type, data, opts={}) {
+  const ctx = document.getElementById(id).getContext('2d');
+  if(charts[id]) charts[id].destroy();
+  charts[id] = new Chart(ctx, {
+    type,
+    data,
+    options: {
+      responsive:true,
+      plugins:{
+        legend:{labels:{color:'#ccc',font:{size:12}}},
+        tooltip:{callbacks:{label: ctx => ` ${ctx.label||ctx.dataset.label}: ${ctx.parsed.y??ctx.parsed}`}}
+      },
+      scales: type==='pie'||type==='doughnut' ? {} : {
+        x:{ticks:{color:'#999'},grid:{color:'#1f1f1f'}},
+        y:{ticks:{color:'#999'},grid:{color:'#1f1f1f'}}
+      },
+      ...opts
+    }
+  });
+}
+
+function updateAllCharts() {
+  // 1. Gender donut
+  const males = count(filtered, w => w.gender==='M');
+  const females = count(filtered, w => w.gender==='F');
+  makeChart('chartGender','doughnut',{
+    labels:['Masculino','Feminino'],
+    datasets:[{data:[males,females],backgroundColor:['#1e6fa8','#a83460'],borderColor:'#111',borderWidth:2}]
+  });
+
+  // 2. Race bar
+  const races = ['Branco','Negro','Latino','Asiático','Misto'];
+  makeChart('chartRace','bar',{
+    labels: races,
+    datasets:[{
+      label:'Vencedores',
+      data: races.map(r => count(filtered, w=>w.race===r)),
+      backgroundColor: races.map(r=>RACE_COLORS[r]),
+    }]
+  },{plugins:{legend:{display:false}}});
+
+  // 3. Male race breakdown (White vs Black)
+  const maleW = count(filtered, w=>w.gender==='M'&&w.race==='Branco');
+  const maleB = count(filtered, w=>w.gender==='M'&&w.race==='Negro');
+  const maleL = count(filtered, w=>w.gender==='M'&&w.race==='Latino');
+  const maleA = count(filtered, w=>w.gender==='M'&&w.race==='Asiático');
+  const maleO = count(filtered, w=>w.gender==='M'&&!['Branco','Negro','Latino','Asiático'].includes(w.race));
+  makeChart('chartMaleRace','doughnut',{
+    labels:['Branco','Negro','Latino','Asiático','Outro'],
+    datasets:[{data:[maleW,maleB,maleL,maleA,maleO],backgroundColor:['#6b7280','#22c55e','#f59e0b','#6366f1','#ec4899'],borderColor:'#111',borderWidth:2}]
+  });
+
+  // 4. Female race breakdown
+  const femW = count(filtered, w=>w.gender==='F'&&w.race==='Branco');
+  const femB = count(filtered, w=>w.gender==='F'&&w.race==='Negro');
+  const femL = count(filtered, w=>w.gender==='F'&&w.race==='Latino');
+  const femA = count(filtered, w=>w.gender==='F'&&w.race==='Asiático');
+  const femO = count(filtered, w=>w.gender==='F'&&!['Branco','Negro','Latino','Asiático'].includes(w.race));
+  makeChart('chartFemaleRace','doughnut',{
+    labels:['Branco','Negro','Latino','Asiático','Outro'],
+    datasets:[{data:[femW,femB,femL,femA,femO],backgroundColor:['#6b7280','#22c55e','#f59e0b','#6366f1','#ec4899'],borderColor:'#111',borderWidth:2}]
+  });
+
+  // 5. Diversity over decades (% non-white)
+  const decadesAll = [1929,1930,1940,1950,1960,1970,1980,1990,2000,2010,2020];
+  const decLabels = decadesAll.map(d => d+'s');
+  const decNonWhite = decadesAll.map(d => {
+    const inDec = actingWinners.filter(w => Math.floor(w.year/10)*10 === d);
+    if(!inDec.length) return 0;
+    return +pct(count(inDec,w=>w.race!=='Branco'), inDec.length);
+  });
+  makeChart('chartDiversity','line',{
+    labels: decLabels,
+    datasets:[{
+      label:'% Não-Brancos',
+      data: decNonWhite,
+      borderColor:'#f5c518',
+      backgroundColor:'rgba(245,197,24,.15)',
+      fill:true,
+      tension:.3,
+      pointBackgroundColor:'#f5c518',
+    }]
+  },{plugins:{legend:{display:false}},scales:{y:{min:0,max:50,ticks:{color:'#999',callback:v=>v+'%'},grid:{color:'#1f1f1f'}},x:{ticks:{color:'#999'},grid:{color:'#1f1f1f'}}}});
+
+  // 6. Best Picture by country
+  const countryCounts = {};
+  bestPicture.forEach(b => {
+    const key = b.country.includes('EUA')&&b.country.length<10 ? 'EUA' : b.country.includes('EUA') ? 'EUA + parceiros' : b.country;
+    countryCounts[key] = (countryCounts[key]||0)+1;
+  });
+  const sortedCountries = Object.entries(countryCounts).sort((a,b)=>b[1]-a[1]);
+  makeChart('chartCountry','bar',{
+    labels: sortedCountries.map(e=>e[0]),
+    datasets:[{
+      label:'Filmes Vencedores',
+      data: sortedCountries.map(e=>e[1]),
+      backgroundColor: sortedCountries.map((_,i)=>i===0?'#f5c518':'#444'),
+    }]
+  },{indexAxis:'y',plugins:{legend:{display:false}}});
+
+  // 7a. Average age per decade by gender (line chart)
+  const decadesAge = [1929,1930,1940,1950,1960,1970,1980,1990,2000,2010,2020];
+  const avgAgeByDecGender = (dec, gender) => {
+    const vals = filtered.filter(w => Math.floor(w.year/10)*10===dec && w.gender===gender && w.age).map(w=>w.age);
+    return vals.length ? +(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : null;
+  };
+  makeChart('chartAgeLine','line',{
+    labels: decadesAge.map(d=>d+'s'),
+    datasets:[
+      {
+        label:'Homens',
+        data: decadesAge.map(d=>avgAgeByDecGender(d,'M')),
+        borderColor:'#5b9bd5',
+        backgroundColor:'rgba(91,155,213,.15)',
+        fill:false, tension:.3,
+        pointBackgroundColor:'#5b9bd5',
+        spanGaps:true,
+      },
+      {
+        label:'Mulheres',
+        data: decadesAge.map(d=>avgAgeByDecGender(d,'F')),
+        borderColor:'#d57bb5',
+        backgroundColor:'rgba(213,123,181,.15)',
+        fill:false, tension:.3,
+        pointBackgroundColor:'#d57bb5',
+        spanGaps:true,
+      },
+    ]
+  },{
+    plugins:{
+      legend:{labels:{color:'#ccc'}},
+      tooltip:{callbacks:{label: ctx=>`${ctx.dataset.label}: ${ctx.parsed.y} anos`}}
+    },
+    scales:{
+      x:{ticks:{color:'#999'},grid:{color:'#1f1f1f'}},
+      y:{min:20,max:85,ticks:{color:'#999',callback:v=>v+' anos'},grid:{color:'#1f1f1f'}}
+    }
+  });
+
+  // 7b. Age distribution by gender (histogram)
+  const ageRanges = ['<25','25-29','30-34','35-39','40-44','45-49','50-54','55-59','60-64','65+'];
+  const ageBucket = age => {
+    if(!age) return null;
+    if(age<25) return '<25';
+    if(age<30) return '25-29';
+    if(age<35) return '30-34';
+    if(age<40) return '35-39';
+    if(age<45) return '40-44';
+    if(age<50) return '45-49';
+    if(age<55) return '50-54';
+    if(age<60) return '55-59';
+    if(age<65) return '60-64';
+    return '65+';
+  };
+  const mAge = {}, fAge = {};
+  ageRanges.forEach(r=>{mAge[r]=0;fAge[r]=0;});
+  filtered.forEach(w => {
+    const b = ageBucket(w.age);
+    if(b) { if(w.gender==='M') mAge[b]++; else fAge[b]++; }
+  });
+  makeChart('chartAge','bar',{
+    labels: ageRanges,
+    datasets:[
+      {label:'Homens',data:ageRanges.map(r=>mAge[r]),backgroundColor:'rgba(30,111,168,.7)'},
+      {label:'Mulheres',data:ageRanges.map(r=>fAge[r]),backgroundColor:'rgba(168,52,96,.7)'},
+    ]
+  });
+
+  // 8. Category x Race stacked bar
+  const catList = ['Melhor Ator','Melhor Atriz','Melhor Ator Coadjuvante','Melhor Atriz Coadjuvante'];
+  const catShort = ['M. Ator','M. Atriz','M. Ator Coad.','M. Atriz Coad.'];
+  const raceList = ['Branco','Negro','Latino','Asiático','Misto'];
+  makeChart('chartCatRace','bar',{
+    labels: catShort,
+    datasets: raceList.map(r => ({
+      label: r,
+      data: catList.map(c => count(actingWinners, w=>w.cat===c&&w.race===r)),
+      backgroundColor: RACE_COLORS[r],
+    }))
+  },{scales:{x:{stacked:true,ticks:{color:'#999'},grid:{color:'#1f1f1f'}},y:{stacked:true,ticks:{color:'#999'},grid:{color:'#1f1f1f'}}}});
+}
+
+// ─── EVENT LISTENERS ──────────────────────────────────────────────────────────
+['fDecade','fCategory','fGender','fRace'].forEach(id =>
+  document.getElementById(id).addEventListener('change', applyFilters)
+);
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+initFilters();
+applyFilters();
+</script>
+</body>
+</html>
